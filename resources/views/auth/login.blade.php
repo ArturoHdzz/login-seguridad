@@ -193,12 +193,12 @@
     });
 
     document.getElementById('register-link').addEventListener('click', function(e) {
-        // Deshabilitar el enlace
+        // Disable the link
         this.style.pointerEvents = 'none';
         this.style.cursor = 'not-allowed';
         this.style.opacity = '0.5';
         
-        // Opcional: Redirigir manualmente después de 300ms (para dar feedback visual)
+        // Optional: Manually redirect after 300ms (to give visual feedback)
         setTimeout(() => {
             window.location.href = this.href;
         }, 300);

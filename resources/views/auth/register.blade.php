@@ -193,7 +193,7 @@
         const submitButton = document.getElementById('submit-button');
         const originalText = submitButton.innerHTML;
         
-        // Deshabilitar y mostrar spinner
+        // Disable and show spinner
         submitButton.disabled = true;
         submitButton.innerHTML = `
             <div class="spinner-border" role="status">
@@ -201,7 +201,7 @@
             </div>
         `;
 
-        // Re-habilitar si hay error de validación
+        // Re-enable if validation error
         window.addEventListener('pageshow', function(event) {
             if (event.persisted || performance.navigation.type === 2) {
                 submitButton.disabled = false;

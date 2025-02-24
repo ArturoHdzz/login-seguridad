@@ -96,11 +96,11 @@
         </form>
     </div>
     <script>
-        // Corrige los selectores para este formulario
+        // Fix the selectors for this form
         document.getElementById('verificationForm').addEventListener('submit', function(e) {
             const submitButton = document.getElementById('verify-button');
             
-            // Deshabilita el botón y muestra estado de carga
+            // Disable button and show charging status
             submitButton.disabled = true;
             submitButton.innerHTML = `
                 <div class="spinner-border" role="status">
@@ -108,11 +108,11 @@
                 </div> Verifying...
             `;
 
-            // Elimina el evento beforeunload al enviar el formulario
+            // Remove the beforeunload event when submitting the form
             window.removeEventListener('beforeunload', beforeUnloadHandler);
         });
 
-        // Mejora el manejo del evento beforeunload
+        // Improves handling of the beforeunload event
         const beforeUnloadHandler = (event) => {
             event.preventDefault();
             event.returnValue = '';
