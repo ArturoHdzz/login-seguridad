@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en"> <!-- Changed language attribute to English -->
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -105,6 +105,42 @@
             color: #721c24;
             border: 1px solid #f5c6cb;
         }
+
+        /* Loading spinner animation */
+        @keyframes spinner-border {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Spinner styling */
+        .spinner-border {
+            display: inline-block;
+            width: 1rem;
+            height: 1rem;
+            border: 0.2em solid currentColor;
+            border-right-color: transparent;
+            border-radius: 50%;
+            animation: spinner-border 0.75s linear infinite;
+            margin-right: 8px;
+        }
+
+        .spinner-border-sm {
+            width: 1rem;
+            height: 1rem;
+            border-width: 0.2em;
+        }
+
+        /* Hide screen reader text */
+        .visually-hidden {
+            position: absolute;
+            width: 1px;
+            height: 1px;
+            padding: 0;
+            margin: -1px;
+            overflow: hidden;
+            clip: rect(0, 0, 0, 0);
+            white-space: nowrap;
+            border-width: 0;
+        }
     </style>
 </head>
 <body>
@@ -181,28 +217,41 @@
         </form>
     </div>
     <script>
-    document.getElementById('login-form').addEventListener('submit', function(e) {
+        // Store the original button text to restore it if needed
         const submitButton = document.getElementById('submit-button');
-        
-        submitButton.disabled = true;
-        submitButton.innerHTML = `
-            <div class="spinner-border spinner-border-sm" role="status">
-                <span class="visually-hidden">Loading...</span>
-            </div>
-        `;
-    });
+        const originalButtonText = submitButton.innerHTML;
 
-    document.getElementById('register-link').addEventListener('click', function(e) {
-        // Disable the link
-        this.style.pointerEvents = 'none';
-        this.style.cursor = 'not-allowed';
-        this.style.opacity = '0.5';
-        
-        // Optional: Manually redirect after 300ms (to give visual feedback)
-        setTimeout(() => {
-            window.location.href = this.href;
-        }, 300);
-    });
+        // Handle form submission
+        document.getElementById('login-form').addEventListener('submit', function(e) {
+            // Disable button and show loading spinner
+            submitButton.disabled = true;
+            submitButton.innerHTML = `
+                <div class="spinner-border spinner-border-sm" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                </div> Processing...
+            `;
+        });
+
+        // Handle registration link click
+        document.getElementById('register-link').addEventListener('click', function(e) {
+            // Disable the link to prevent double-clicks
+            this.style.pointerEvents = 'none';
+            this.style.cursor = 'not-allowed';
+            this.style.opacity = '0.5';
+            
+            // Manually redirect after 300ms to give visual feedback
+            setTimeout(() => {
+                window.location.href = this.href;
+            }, 300);
+        });
+
+        // Restore button state when navigating back
+        window.addEventListener('pageshow', function(event) {
+            if (event.persisted || performance.navigation.type === 2) {
+                submitButton.disabled = false;
+                submitButton.innerHTML = originalButtonText;
+            }
+        });
     </script>
 </body>
 </html>
