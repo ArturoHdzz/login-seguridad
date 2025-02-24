@@ -45,6 +45,11 @@ class Handler extends ExceptionHandler
             if ($e instanceof NotFoundHttpException) {
                 return $this->handleHttpException($e);
             }
+
+            // Handle 419 CSRF token mismatch errors
+            if ($e instanceof TokenMismatchException) {
+                return $this->handleTokenMismatchException($e);
+            }
         });
     }
 
@@ -76,6 +81,19 @@ class Handler extends ExceptionHandler
         }
         
         return parent::render(request(), $e);
+    }
+
+    /**
+     * Handle token mismatch exceptions (419 errors).
+     *
+     * @param  \Illuminate\Session\TokenMismatchException  $e
+     * @return \Illuminate\Http\Response
+     */
+    protected function handleTokenMismatchException($e)
+    {
+        return response()->view('errors.419', [
+            'message' => 'Your session has expired. Please try again.'
+        ], 419);
     }
 
     /**

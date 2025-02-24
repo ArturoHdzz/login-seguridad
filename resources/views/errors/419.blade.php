@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Page Not Found</title>
+    <title>Expired Page</title>
     <style>
         /* CSS Reset - removes default browser margins and padding */
         * {
@@ -123,14 +123,14 @@
 <body>
     <!-- Main container for the error content -->
     <div class="error-container">
-        <!-- Large 404 error code display -->
-        <div class="error-code">404</div>
+        <!-- Large 419 error code display -->
+        <div class="error-code">419</div>
         
         <!-- Main error message heading -->
-        <h1 class="error-message">Page Not Found</h1>
+        <h1 class="error-message">Expired Page</h1>
         
         <!-- Descriptive text explaining the error -->
-        <p class="error-description">Sorry, the page you are looking for doesn't exist or has been moved to another location.</p>
+        <p class="error-description">Sorry, your session has expired or the security token is invalid.</p>
         
         <!-- Navigation button to return to homepage
              The {{ url('/') }} is a Laravel Blade directive that generates the base URL -->
