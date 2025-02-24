@@ -90,10 +90,35 @@
             </div>
 
             <!-- Submit button for the verification form -->
-            <button type="submit" class="login-button">
+            <button type="submit" class="login-button" id="verify-button">
                 Verify
             </button>
         </form>
     </div>
+    <script>
+        // Corrige los selectores para este formulario
+        document.getElementById('verificationForm').addEventListener('submit', function(e) {
+            const submitButton = document.getElementById('verify-button');
+            
+            // Deshabilita el botón y muestra estado de carga
+            submitButton.disabled = true;
+            submitButton.innerHTML = `
+                <div class="spinner-border" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                </div> Verifying...
+            `;
+
+            // Elimina el evento beforeunload al enviar el formulario
+            window.removeEventListener('beforeunload', beforeUnloadHandler);
+        });
+
+        // Mejora el manejo del evento beforeunload
+        const beforeUnloadHandler = (event) => {
+            event.preventDefault();
+            event.returnValue = '';
+        };
+
+        window.addEventListener('beforeunload', beforeUnloadHandler);
+    </script>
 </body>
 </html>

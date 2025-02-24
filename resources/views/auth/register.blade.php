@@ -188,5 +188,27 @@
             </button>
         </form>
     </div>
+    <script>
+    document.getElementById('registration-form').addEventListener('submit', function(e) {
+        const submitButton = document.getElementById('submit-button');
+        const originalText = submitButton.innerHTML;
+        
+        // Deshabilitar y mostrar spinner
+        submitButton.disabled = true;
+        submitButton.innerHTML = `
+            <div class="spinner-border" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+        `;
+
+        // Re-habilitar si hay error de validación
+        window.addEventListener('pageshow', function(event) {
+            if (event.persisted || performance.navigation.type === 2) {
+                submitButton.disabled = false;
+                submitButton.innerHTML = originalText;
+            }
+        });
+    });
+    </script>
 </body>
 </html>

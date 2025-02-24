@@ -176,9 +176,33 @@
 
             <!-- Registration link -->
             <div class="enlace-registro">
-                <a href="{{ route('register.show') }}">Don't have an account? Register</a>
+                <a href="{{ route('register.show') }}" id="register-link">Don't have an account? Register</a>
             </div>
         </form>
     </div>
+    <script>
+    document.getElementById('login-form').addEventListener('submit', function(e) {
+        const submitButton = document.getElementById('submit-button');
+        
+        submitButton.disabled = true;
+        submitButton.innerHTML = `
+            <div class="spinner-border spinner-border-sm" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+        `;
+    });
+
+    document.getElementById('register-link').addEventListener('click', function(e) {
+        // Deshabilitar el enlace
+        this.style.pointerEvents = 'none';
+        this.style.cursor = 'not-allowed';
+        this.style.opacity = '0.5';
+        
+        // Opcional: Redirigir manualmente después de 300ms (para dar feedback visual)
+        setTimeout(() => {
+            window.location.href = this.href;
+        }, 300);
+    });
+    </script>
 </body>
 </html>
