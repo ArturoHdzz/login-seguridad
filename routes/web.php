@@ -113,3 +113,7 @@ Route::middleware(['web', 'prevent-back'])->group(function () {
             ->name('logout');
     });
 });
+
+Route::fallback(function () {
+    return view('errors.404');
+});

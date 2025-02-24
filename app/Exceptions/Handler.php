@@ -40,6 +40,11 @@ class Handler extends ExceptionHandler
             if ($e instanceof \Illuminate\Validation\ValidationException) {
                 return $this->handleValidationException($e);
             }
+
+            // Handle 404 errors
+            if ($e instanceof NotFoundHttpException) {
+                return $this->handleHttpException($e);
+            }
         });
     }
 
@@ -56,6 +61,21 @@ class Handler extends ExceptionHandler
         }
 
         return redirect()->back()->withInput()->withErrors($e->errors());
+    }
+
+    /**
+     * Handle HTTP exceptions.
+     *
+     * @param  \Throwable  $e
+     * @return \Illuminate\Http\Response
+     */
+    protected function handleHttpException($e)
+    {
+        if ($e instanceof NotFoundHttpException) {
+            return response()->view('errors.404', [], 404);
+        }
+        
+        return parent::render(request(), $e);
     }
 
     /**
