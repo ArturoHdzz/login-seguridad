@@ -97,7 +97,7 @@
     <div class="registration-container">
         <form id="registration-form" action="{{ route('register') }}" method="POST" class="registration-form">
             @csrf
-            <h2>Registration</h2>
+            <h2>Registration 2</h2>
 
             <!-- Display errors if any -->
             @if(session('success'))
