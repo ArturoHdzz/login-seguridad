@@ -64,9 +64,9 @@ return [
                 PDO::MYSQL_ATTR_SSL_KEY => env('DB_SSL_KEY'),
                 PDO::MYSQL_ATTR_SSL_VERIFY_SERVER_CERT => true,
             ],
-            // 'options' => extension_loaded('pdo_mysql') ? array_filter([
+            //'options' => extension_loaded('pdo_mysql') ? array_filter([
             //     PDO::MYSQL_ATTR_SSL_CA => env('MYSQL_ATTR_SSL_CA'),
-            // ]) : [],
+            //]) : [],
         ],
 
         'pgsql' => [

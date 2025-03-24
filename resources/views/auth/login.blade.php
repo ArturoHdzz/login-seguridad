@@ -173,7 +173,7 @@
                 </div>
             @endif
 
-            <h2>Login</h2>
+            <h2>Login 2</h2>
 
             <!-- Email input -->
             <div class="grupo-formulario">
