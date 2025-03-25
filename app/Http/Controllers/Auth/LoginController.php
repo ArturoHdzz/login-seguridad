@@ -33,54 +33,60 @@ class LoginController extends Controller
      */
     public function step1(Request $request)
     {
-        // Previene sesiones fantasmas en caso de errores
-        if (Auth::check()) {
-            Auth::logout();
-            $request->session()->invalidate();
-            $request->session()->regenerateToken();
+        $errors = [];
+
+        // Validación manual sin lanzar excepción
+        if (!$request->filled('email') || !filter_var($request->email, FILTER_VALIDATE_EMAIL)) {
+            $errors[] = 'El email es obligatorio y debe ser válido.';
         }
 
-        // Validación
-        $request->validate([
-            'email' => ['required', 'email'],
-            'password' => ['required'],
-            'g-recaptcha-response' => ['required', 'captcha']
-        ]);
+        if (!$request->filled('password')) {
+            $errors[] = 'La contraseña es obligatoria.';
+        }
 
-        // Verifica usuario
+        if (!$request->filled('g-recaptcha-response')) {
+            $errors[] = 'Debe resolver el reCAPTCHA.';
+        } elseif (!app('captcha')->verify($request->input('g-recaptcha-response'))) {
+            $errors[] = 'El reCAPTCHA no fue válido.';
+        }
+
+        // Si hay errores, retornar con una variable de sesión personalizada
+        if (!empty($errors)) {
+            return redirect()->route('login')
+                ->with('login_errors', $errors)
+                ->withInput($request->except('password'));
+        }
+
+        // Validar usuario
         $user = User::where('email', $request->email)->first();
 
         if (!$user || !Hash::check($request->password, $user->password)) {
-            return back()->withErrors([
-                'email' => 'Credenciales incorrectas.'
-            ])->withInput();
+            return redirect()->route('login')
+                ->with('login_errors', ['Las credenciales no coinciden con nuestros registros.'])
+                ->withInput($request->except('password'));
         }
 
         if (!$user->email_verified) {
-            return back()->withErrors([
-                'email' => 'Debes verificar tu correo electrónico.'
-            ])->withInput();
+            return redirect()->route('login')
+                ->with('login_errors', ['Debes verificar tu correo electrónico antes de iniciar sesión.'])
+                ->withInput($request->except('password'));
         }
 
-        // Genera código y lo guarda cifrado
+        // Código de verificación
         $plainCode = Str::random(6);
-        $hashedCode = Hash::make($plainCode);
-
         $user->update([
-            'verification_code' => $hashedCode,
+            'verification_code' => Hash::make($plainCode),
             'code_expires_at' => now()->addMinutes(15),
         ]);
 
-        // Envia por email
+        // Enviar correo
         Mail::to($user->email)->send(new VerificationCodeMail($plainCode));
 
-        // Guarda email temporalmente en sesión
-        $request->session()->put('login_email', $user->email);
-        $request->session()->save();
+        // Guardar sesión y redirigir
+        session(['login_email' => $user->email]);
 
         return redirect()->route('login.verification')->with('info', 'Se envió un código de verificación a tu correo.');
     }
-
 
     /**
      * Display the verification form where the user can enter the verification code.
@@ -88,10 +94,10 @@ class LoginController extends Controller
      */
     public function showVerificationForm()
     {
+        // Check if the email exists in the session
         if (!session()->has('login_email')) {
-            return redirect()->route('login')->withErrors([
-                'error' => 'Por favor, inicia sesión nuevamente.'
-            ]);
+            return redirect()->route('login')
+                ->withErrors(['error' => 'Please log in again.']);
         }
 
         return view('auth.verification');
@@ -107,37 +113,41 @@ class LoginController extends Controller
      */
     public function verifyCode(Request $request)
     {
+        // Validate that the code is a string of exactly 6 characters
         $request->validate([
             'code' => ['required', 'string', 'size:6'],
             'g-recaptcha-response' => ['required', 'captcha']
         ]);
-
+    
+        // Find the user by email and ensure the code is not expired
         $user = User::where('email', session('login_email'))
-                    ->where('code_expires_at', '>', now())
-                    ->first();
-
+                   ->where('code_expires_at', '>', now())
+                   ->first();
+    
         if (!$user || !Hash::check($request->code, $user->verification_code)) {
-            return back()->withErrors(['code' => 'Código inválido o expirado.']);
+            return back()->withErrors([
+                'code' => 'Invalid or expired code.'
+            ]);
         }
-
-        // Limpia sesión vieja y regenera
+    
+        // Clear the temporary session data
         session()->flush();
-        session()->regenerate();
-
-        // Autenticación manual
-        Auth::login($user);
-
-        // Guarda cookie personalizada de sesión
+        session()->regenerate(true);
+    
+        // Create a persistent session cookie for the user
         $response = redirect()->intended(RouteServiceProvider::HOME);
         $response->withCookie(cookie()->forever('user_session', encrypt($user->id)));
-
-        // Limpia código de verificación en DB
+    
+        // Log the user in manually
+        Auth::login($user);
+    
+        // Update the user’s record by clearing the verification code and expiration time
         $user->update([
             'verification_code' => null,
             'code_expires_at' => null,
             'last_login_at' => now()
         ]);
-
+    
         return $response;
     }
 
@@ -149,11 +159,13 @@ class LoginController extends Controller
      */
     public function logout(Request $request)
     {
+        // Log the user out manually
         Auth::logout();
-        $request->session()->invalidate();
-        $request->session()->regenerateToken();
-
-        return redirect()->route('login')
+    
+        // Remove the 'user_session' cookie
+        $response = redirect()->route('login')
             ->withCookie(cookie()->forget('user_session'));
+    
+        return $response;
     }
 }

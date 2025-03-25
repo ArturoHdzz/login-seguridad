@@ -163,15 +163,16 @@
             @endif
 
             <!-- Display validation errors -->
-            @if($errors->any())
+            @if(session('login_errors'))
                 <div class="alert alert-danger">
                     <ul>
-                        @foreach($errors->all() as $error)
+                        @foreach(session('login_errors') as $error)
                             <li>{{ $error }}</li>
                         @endforeach
                     </ul>
                 </div>
             @endif
+
 
             <h2>Login 2</h2>
 
