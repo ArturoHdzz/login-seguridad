@@ -111,7 +111,7 @@
         <!-- Verification form for user input -->
         <form action="{{ route('login.verify') }}" method="POST" class="verification-form" id="verificationForm">
             @csrf
-            <h2>Code Verification</h2>
+            <h2>Code Verification 2</h2>
 
             <!-- Display validation errors if any -->
             @if(session('login_errors'))
