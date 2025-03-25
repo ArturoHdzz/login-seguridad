@@ -15,9 +15,7 @@ use App\Providers\RouteServiceProvider;
 class LoginController extends Controller
 {
     /**
-     * Display the login form.
-     *
-     * @return \Illuminate\View\View
+     * Show the login form view.
      */
     public function showLoginForm()
     {
@@ -25,147 +23,130 @@ class LoginController extends Controller
     }
 
     /**
-     * Handle the first step of the login process where the user's credentials are validated.
-     * If valid, a verification code is sent to the user's email.
-     *
-     * @param \Illuminate\Http\Request $request
-     * @return \Illuminate\Http\RedirectResponse
+     * Handle step 1 of the login process: email/password/captcha validation + code sending.
      */
     public function step1(Request $request)
     {
         $errors = [];
 
-        // Validación manual sin lanzar excepción
+        // validation
         if (!$request->filled('email') || !filter_var($request->email, FILTER_VALIDATE_EMAIL)) {
-            $errors[] = 'El email es obligatorio y debe ser válido.';
+            $errors[] = 'Email is required and must be valid.';
         }
 
         if (!$request->filled('password')) {
-            $errors[] = 'La contraseña es obligatoria.';
+            $errors[] = 'Password is required.';
         }
 
         if (!$request->filled('g-recaptcha-response')) {
-            $errors[] = 'Debe resolver el reCAPTCHA.';
+            $errors[] = 'reCAPTCHA is required.';
         } elseif (!app('captcha')->verifyResponse($request->input('g-recaptcha-response'))) {
-            $errors[] = 'El reCAPTCHA no fue válido.';
-        }        
+            $errors[] = 'Invalid reCAPTCHA.';
+        }
 
-        // Si hay errores, retornar con una variable de sesión personalizada
         if (!empty($errors)) {
             return redirect()->route('login')
                 ->with('login_errors', $errors)
                 ->withInput($request->except('password'));
         }
 
-        // Validar usuario
+        // Authenticate user
         $user = User::where('email', $request->email)->first();
 
         if (!$user || !Hash::check($request->password, $user->password)) {
             return redirect()->route('login')
-                ->with('login_errors', ['Las credenciales no coinciden con nuestros registros.'])
+                ->with('login_errors', ['Invalid credentials.'])
                 ->withInput($request->except('password'));
         }
 
         if (!$user->email_verified) {
             return redirect()->route('login')
-                ->with('login_errors', ['Debes verificar tu correo electrónico antes de iniciar sesión.'])
+                ->with('login_errors', ['You must verify your email before logging in.'])
                 ->withInput($request->except('password'));
         }
 
-        // Código de verificación
-        $plainCode = Str::random(6);
+        // Generate and send verification code
+        $plainCode = Str::random(length: 6);
         $user->update([
             'verification_code' => Hash::make($plainCode),
             'code_expires_at' => now()->addMinutes(15),
         ]);
 
-        // Enviar correo
         Mail::to($user->email)->send(new VerificationCodeMail($plainCode));
 
-        // Guardar sesión y redirigir
         session(['login_email' => $user->email]);
 
-        return redirect()->route('login.verification')->with('info', 'Se envió un código de verificación a tu correo.');
+        return redirect()->route('login.verification')->with('info', 'A verification code has been sent to your email.');
     }
 
     /**
-     * Display the verification form where the user can enter the verification code.
-     *
+     * Show the code verification form.
      */
     public function showVerificationForm()
     {
-        // Check if the email exists in the session
         if (!session()->has('login_email')) {
-            return redirect()->route('login')
-                ->withErrors(['error' => 'Please log in again.']);
+            return redirect()->route('login')->withErrors([
+                'error' => 'Please start the login process again.'
+            ]);
         }
 
         return view('auth.verification');
     }
 
     /**
-     * Verify the provided code and log the user in if valid.
-     * If valid, clears the session and regenerates it, creates a persistent user session cookie, 
-     * and logs the user in manually.
-     *
-     * @param \Illuminate\Http\Request $request
-     * @return \Illuminate\Http\RedirectResponse
+     * Handle code verification and login.
      */
     public function verifyCode(Request $request)
     {
-        // Validate that the code is a string of exactly 6 characters
-        $request->validate([
-            'code' => ['required', 'string', 'size:6'],
-            'g-recaptcha-response' => ['required', 'captcha']
-        ]);
-    
-        // Find the user by email and ensure the code is not expired
-        $user = User::where('email', session('login_email'))
-                   ->where('code_expires_at', '>', now())
-                   ->first();
-    
-        if (!$user || !Hash::check($request->code, $user->verification_code)) {
-            return back()->withErrors([
-                'code' => 'Invalid or expired code.'
-            ]);
+        $errors = [];
+
+        if (!$request->filled('code') || strlen($request->code) !== 6) {
+            $errors[] = 'The verification code must be exactly 6 characters.';
         }
-    
-        // Clear the temporary session data
+
+        if (!$request->filled('g-recaptcha-response')) {
+            $errors[] = 'reCAPTCHA is required.';
+        } elseif (!app('captcha')->verifyResponse($request->input('g-recaptcha-response'))) {
+            $errors[] = 'Invalid reCAPTCHA.';
+        }
+
+        if (!empty($errors)) {
+            return redirect()->back()
+                ->withErrors($errors)
+                ->withInput();
+        }
+
+        $user = User::where('email', session('login_email'))
+            ->where('code_expires_at', '>', now())
+            ->first();
+
+        if (!$user || !Hash::check($request->code, $user->verification_code)) {
+            return back()->withErrors(['code' => 'Invalid or expired code.']);
+        }
+
+        // Clear session and regenerate
         session()->flush();
         session()->regenerate(true);
-    
-        // Create a persistent session cookie for the user
-        $response = redirect()->intended(RouteServiceProvider::HOME);
-        $response->withCookie(cookie()->forever('user_session', encrypt($user->id)));
-    
-        // Log the user in manually
+
         Auth::login($user);
-    
-        // Update the user’s record by clearing the verification code and expiration time
         $user->update([
             'verification_code' => null,
             'code_expires_at' => null,
-            'last_login_at' => now()
+            'last_login_at' => now(),
         ]);
-    
-        return $response;
+
+        return redirect()->intended(RouteServiceProvider::HOME)
+            ->withCookie(cookie()->forever('user_session', encrypt($user->id)));
     }
 
     /**
-     * Log the user out, clear the session and cookie.
-     *
-     * @param \Illuminate\Http\Request $request
-     * @return \Illuminate\Http\RedirectResponse
+     * Logout user and clear session + cookie.
      */
     public function logout(Request $request)
     {
-        // Log the user out manually
         Auth::logout();
-    
-        // Remove the 'user_session' cookie
-        $response = redirect()->route('login')
+
+        return redirect()->route('login')
             ->withCookie(cookie()->forget('user_session'));
-    
-        return $response;
     }
 }
