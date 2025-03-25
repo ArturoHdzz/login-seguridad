@@ -42,7 +42,7 @@ class LoginController extends Controller
         ]);
         
         if ($validator->fails()) {
-            return back()->withErrors($validator)->withInput();
+            return back()->withErrors($validator->errors())->withInput();
         }
         
         $credentials = $validator->validated();
@@ -116,7 +116,7 @@ class LoginController extends Controller
         ]);
         
         if ($validator->fails()) {
-            return back()->withErrors($validator)->withInput();
+            return back()->withErrors($validator->errors())->withInput();
         }
     
         // Find the user by email and ensure the code is not expired
