@@ -46,7 +46,7 @@ class LoginController extends Controller
 
         if (!$request->filled('g-recaptcha-response')) {
             $errors[] = 'Debe resolver el reCAPTCHA.';
-        } elseif (!app('captcha')->verify($request->input('g-recaptcha-response'))) {
+        } elseif (!app('captcha')->validate($request->input('g-recaptcha-response'))) {
             $errors[] = 'El reCAPTCHA no fue válido.';
         }
 
