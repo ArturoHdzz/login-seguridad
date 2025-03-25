@@ -11,6 +11,7 @@ use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Mail;
 use App\Mail\VerificationCodeMail;
 use App\Providers\RouteServiceProvider;
+use Anhskohbo\NoCaptcha\Facades\NoCaptcha;
 
 class LoginController extends Controller
 {
@@ -46,7 +47,7 @@ class LoginController extends Controller
 
         if (!$request->filled('g-recaptcha-response')) {
             $errors[] = 'Debe resolver el reCAPTCHA.';
-        } elseif (!app('captcha')->validate($request->input('g-recaptcha-response'))) {
+        } elseif (!NoCaptcha::check($request->input('g-recaptcha-response'))) {
             $errors[] = 'El reCAPTCHA no fue válido.';
         }
 

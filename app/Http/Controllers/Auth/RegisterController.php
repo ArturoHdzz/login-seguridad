@@ -11,6 +11,7 @@ use Illuminate\Support\Facades\Hash;
 use App\Models\User;
 use App\Mail\VerificationMail;
 use App\Mail\EmailVerification;
+use Anhskohbo\NoCaptcha\Facades\NoCaptcha;
 
 class RegisterController extends Controller
 {
@@ -49,8 +50,8 @@ class RegisterController extends Controller
         }
     
         if (!$request->filled('g-recaptcha-response')) {
-            $errors[] = 'Debes resolver el reCAPTCHA.';
-        } elseif (!app('captcha')->validate($request->input('g-recaptcha-response'))) {
+            $errors[] = 'Debe resolver el reCAPTCHA.';
+        } elseif (!NoCaptcha::check($request->input('g-recaptcha-response'))) {
             $errors[] = 'El reCAPTCHA no fue válido.';
         }
     
