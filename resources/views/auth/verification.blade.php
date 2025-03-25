@@ -114,9 +114,9 @@
             <h2>Code Verification</h2>
 
             <!-- Display validation errors if any -->
-            @if($errors->any())
+            @if(session('login_errors'))
                 <div class="error-alert">
-                    @foreach($errors->all() as $error)
+                    @foreach(session('login_errors') as $error)
                         <p>{{ $error }}</p>
                     @endforeach
                 </div>
