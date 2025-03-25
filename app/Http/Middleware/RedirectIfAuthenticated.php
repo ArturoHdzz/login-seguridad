@@ -20,13 +20,16 @@ class RedirectIfAuthenticated
     public function handle(Request $request, Closure $next, ...$guards)
     {
         $guards = empty($guards) ? [null] : $guards;
-
+    
         foreach ($guards as $guard) {
             if (Auth::guard($guard)->check()) {
-                return redirect(RouteServiceProvider::HOME);
+                // Solo redirige si NO estás en el paso de verificación
+                if (!$request->is('login/verification') && !$request->is('login/verify')) {
+                    return redirect(RouteServiceProvider::HOME);
+                }
             }
         }
-
+    
         return $next($request);
     }
 }
