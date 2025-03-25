@@ -38,27 +38,54 @@ Route::middleware(['web'])->group(function () {
      * Public routes - Accessible only by unauthenticated users
      * Middleware 'guest' ensures authenticated users cannot access these routes
      */
-    Route::controller(RegisterController::class)->group(function () {
-        Route::get('/register', 'showRegistrationForm')->name('register.show');
-        Route::post('/register', 'register')->name('register');
-        Route::get('/verification/registration', function () {
-            return view('auth.registration-verification');
-        })->name('verification.registration')->middleware('verification.state');
-        Route::post('/verification/registration', 'verifyRegistration')->name('verification.registration.verify');
-    });
-    
-    // Login form y primer paso sí deben tener 'guest'
-    Route::middleware('guest')->controller(LoginController::class)->group(function () {
-        Route::get('/login', 'showLoginForm')->name('login');
-        Route::post('/login/step1', 'step1')->name('login.step1');
-    });
+    Route::middleware('guest')->group(function () {
+        /**
+         * User Registration Routes
+         */
+        Route::controller(RegisterController::class)->group(function () {
+            // Registration form
+            Route::get('/register', 'showRegistrationForm')
+                ->name('register.show');
 
-    // Pero las rutas que usan código de verificación NO deben tener 'guest'
-    Route::controller(LoginController::class)->group(function () {
-        Route::get('/login/verification', 'showVerificationForm')->name('login.verification');
-        Route::post('/login/verify', 'verifyCode')->name('login.verify');
-    });
+            // Process registration
+            Route::post('/register', 'register')
+                ->name('register')
+                ->where('email', '[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}$'); // Basic email validation
 
+            // Post-registration verification view
+            Route::get('/verification/registration', function () {
+                return view('auth.registration-verification');
+            })
+            ->name('verification.registration')
+            ->middleware('verification.state');
+
+            // Verify registration code
+            Route::post('/verification/registration', 'verifyRegistration')
+                ->name('verification.registration.verify');
+        });
+
+        /**
+         * Authentication (Login) Routes
+         * Implements the two-step login process
+         */
+        Route::controller(LoginController::class)->group(function () {
+            // Login form
+            Route::get('/login', 'showLoginForm')
+                ->name('login');
+            
+            // First step of authentication
+            Route::post('/login/step1', 'step1')
+                ->name('login.step1');
+            
+            // Verification form
+            Route::get('/login/verification', 'showVerificationForm')
+                ->name('login.verification');
+            
+            // Verify authentication code
+            Route::post('/login/verify', 'verifyCode')
+                ->name('login.verify');
+        });
+    });
 
     /**
      * Email verification route
