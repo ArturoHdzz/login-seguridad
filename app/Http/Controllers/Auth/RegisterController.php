@@ -24,7 +24,6 @@ class RegisterController extends Controller
     // Handle registration and send email verification
     public function register(Request $request)
     {
-        // Validate the input data
         $validator = Validator::make($request->all(), [
             'name' => ['required', 'string', 'min:3', 'max:100', 'regex:/^[A-Za-zÁ-ÿ\s]+$/'],
             'email' => ['required', 'email', 'unique:users,email', 'max:255', 'regex:/^([a-zA-Z0-9._%+-]+@(gmail\.com|hotmail\.com))$/'],
@@ -36,46 +35,39 @@ class RegisterController extends Controller
             ],
             'g-recaptcha-response' => ['required', 'captcha']
         ]);
-        
+    
         if ($validator->fails()) {
             return back()->withErrors($validator)->withInput();
         }
-        
-        $validatedData = $validator->validated();
+    
+        $validated = $validator->validated();
     
         try {
-            // Create the user without verification
             $user = User::create([
-                'name' => $validatedData['name'],
-                'email' => $validatedData['email'],
-                'password' => $validatedData['password'],
+                'name' => $validated['name'],
+                'email' => $validated['email'],
+                'password' => bcrypt($validated['password']),
             ]);
     
-            // Generate a signed URL that expires in 24 hours
-            $url = URL::temporarySignedRoute(
-                'verification.email',
-                now()->addHours(24),
-                ['id' => $user->id]
-            );
+            $plainCode = Str::random(6);
+            $hashedCode = Hash::make($plainCode);
     
-            // Send the verification email
-            Mail::to($user->email)->send(new EmailVerification($url, $user->name));
+            $user->update([
+                'verification_code' => $hashedCode,
+                'code_expires_at' => now()->addMinutes(15),
+            ]);
     
-            // Redirect with a detailed success message
-            return redirect()->route('login')->with('success', 
-                'Registration successful! We have sent a verification email to ' . $user->email . 
-                ' with a link to verify your account. Please check your inbox and spam folder. ' .
-                'The link will expire in 24 hours.'
-            );
+            Mail::to($user->email)->send(new EmailVerification($plainCode, $user->name));
+    
+            session()->put('verify_email', $user->email);
+    
+            return redirect()->route('verification.registration')->with('info', 'We sent a code to your email.');
     
         } catch (\Exception $e) {
-            // Handle errors while sending the email
-            return redirect()->back()
-                ->withInput()
-                ->withErrors(['error' => 'There was an issue sending the verification email. Please try again.']);
+            return back()->withInput()->withErrors(['error' => 'There was an issue sending the verification email.']);
         }
     }
-
+    
     // Verify email through the provided signed URL
     public function verifyEmail(Request $request, $id)
     {
