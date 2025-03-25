@@ -23,8 +23,8 @@ class RegisterController extends Controller
     // Handle registration and send email verification
     public function register(Request $request)
     {
-        // Validate the input data
-        $validatedData = $request->validate([
+        // Usar Validator facade para control manual
+        $validator = \Illuminate\Support\Facades\Validator::make($request->all(), [
             'name' => ['required', 'string', 'min:3', 'max:100', 'regex:/^[A-Za-zÁ-ÿ\s]+$/'],
             'email' => ['required', 'email', 'unique:users,email', 'max:255', 'regex:/^([a-zA-Z0-9._%+-]+@(gmail\.com|hotmail\.com))$/'],
             'password' => [
@@ -33,36 +33,60 @@ class RegisterController extends Controller
                 'confirmed', 
                 'regex:/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/'
             ],
-            'g-recaptcha-response' => ['required', 'captcha']
+            'g-recaptcha-response' => ['required']
         ]);
-    
+        
+        // Validación manual de captcha para evitar problemas en producción
+        if ($request->has('g-recaptcha-response')) {
+            $captcha = $request->input('g-recaptcha-response');
+            $response = \Illuminate\Support\Facades\Http::asForm()->post('https://www.google.com/recaptcha/api/siteverify', [
+                'secret' => config('captcha.secret'),
+                'response' => $captcha,
+                'remoteip' => $request->ip()
+            ]);
+            
+            if (!$response->json('success')) {
+                $validator->errors()->add('g-recaptcha-response', 'La verificación de captcha falló.');
+            }
+        }
+        
+        // Si hay errores, redirigir con errores
+        if ($validator->fails()) {
+            return redirect()->back()
+                ->withErrors($validator)
+                ->withInput();
+        }
+        
+        // Obtener los datos validados
+        $validatedData = $validator->validated();
+        
         try {
-            // Create the user without verification
+            // Crear usuario sin verificación
             $user = User::create([
                 'name' => $validatedData['name'],
                 'email' => $validatedData['email'],
                 'password' => $validatedData['password'],
             ]);
-    
-            // Generate a signed URL that expires in 24 hours
+
+            // Generar URL firmada que expira en 24 horas
             $url = URL::temporarySignedRoute(
                 'verification.email',
                 now()->addHours(24),
                 ['id' => $user->id]
             );
-    
-            // Send the verification email
+
+            // Enviar email de verificación
             Mail::to($user->email)->send(new EmailVerification($url, $user->name));
-    
-            // Redirect with a detailed success message
+
+            // Redirigir con mensaje de éxito
             return redirect()->route('login')->with('success', 
                 'Registration successful! We have sent a verification email to ' . $user->email . 
                 ' with a link to verify your account. Please check your inbox and spam folder. ' .
                 'The link will expire in 24 hours.'
             );
-    
+
         } catch (\Exception $e) {
-            // Handle errors while sending the email
+            // Manejar errores al enviar el email
             return redirect()->back()
                 ->withInput()
                 ->withErrors(['error' => 'There was an issue sending the verification email. Please try again.']);
@@ -104,11 +128,18 @@ class RegisterController extends Controller
     // Handle the email verification process after user inputs the verification code
     public function verifyRegistration(Request $request)
     {
-        // Validate the verification code
-        $request->validate([
+        // Validar el código de verificación con Validator facade
+        $validator = \Illuminate\Support\Facades\Validator::make($request->all(), [
             'code' => ['required', 'string', 'size:6']
         ]);
-
+        
+        // Si hay errores, redirigir con errores
+        if ($validator->fails()) {
+            return redirect()->back()
+                ->withErrors($validator)
+                ->withInput();
+        }
+        
         $email = session('verify_email');
         if (!$email) {
             return redirect()->route('register.show');
@@ -123,12 +154,12 @@ class RegisterController extends Controller
             return back()->withErrors(['code' => 'User not found or code expired.']);
         }
 
-        // Verify the hashed code
+        // Verificar el código hasheado
         if (!Hash::check($request->code, $user->verification_code)) {
             return back()->withErrors(['code' => 'Invalid code.']);
         }
 
-        // Mark the email as verified
+        // Marcar el email como verificado
         $user->update([
             'email_verified' => true,
             'verification_code' => null,
