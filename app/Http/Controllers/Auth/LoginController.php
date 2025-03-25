@@ -21,7 +21,10 @@ class LoginController extends Controller
      */
     public function showLoginForm()
     {
-        return view('auth.login');
+        session()->flush();
+
+        // Borra la cookie si aún está
+        return response()->view('auth.login')->withCookie(cookie()->forget('user_session'));
     }
 
     /**

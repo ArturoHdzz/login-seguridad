@@ -4,7 +4,6 @@ namespace App\Providers;
 
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Facades\Session;
-use Illuminate\Support\Facades\URL;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -32,11 +31,17 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot()
     {
-        if (
-            isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && 
-            $_SERVER['HTTP_X_FORWARDED_PROTO'] === 'https'
-        ) {
-            URL::forceScheme('https');
+        // Clear all sessions at the start of the application
+        // This check ensures that the action is only executed in a web request context
+        if (!app()->runningInConsole()) {
+            // Check if the session does not already contain a '_token' key
+            if (!Session::has('_token')) {
+                // Flush all session data
+                Session::flush();
+                
+                // Regenerate the session ID to ensure security
+                Session::regenerate();
+            }
         }
     }
 }

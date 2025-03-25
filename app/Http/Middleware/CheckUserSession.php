@@ -12,46 +12,41 @@ class CheckUserSession
     /**
      * Handle an incoming request.
      *
-     * This middleware checks the presence of the `user_session` cookie in the request.
-     * If the cookie is missing or its value has changed, the user's session is logged out and they are redirected to the login page.
-     * If the cookie is present and its value has not changed, the request is allowed to proceed.
-     * 
-     * @param \Illuminate\Http\Request $request
-     * @param \Closure $next
-     * @return \Illuminate\Http\RedirectResponse|\Illuminate\Http\Response
+     * This middleware ensures the presence and validity of the 'user_session' cookie,
+     * and that the authenticated user session matches it.
      */
     public function handle(Request $request, Closure $next)
     {
-        // Check if the 'user_session' cookie is present
-        if (!$request->hasCookie('user_session')) {
-            // If the cookie is not present, log the user out
-            Auth::logout();
-
-            // Redirect to the login page and forget the session cookie
-            return redirect()->route('login')->withCookie(cookie()->forget('laravel_session'));
-        }
-
-        // Retrieve the current value of the 'user_session' cookie
         $currentUserSession = $request->cookie('user_session');
-        
-        // Retrieve the stored session token
         $storedUserSession = session('user_session_token');
 
-        // Check if the stored session token is available and if it has changed
-        if ($storedUserSession && $currentUserSession !== $storedUserSession) {
-            // If the session token has changed, log the user out
-            Auth::logout();
-
-            // Redirect to the login page, forget the session cookie, and display an error message
+        // Caso 1: El usuario no está autenticado pero la cookie 'user_session' existe → inválido
+        if (!Auth::check() && $currentUserSession) {
             return redirect()->route('login')
-                ->withCookie(cookie()->forget('laravel_session'))
-                ->withErrors(['error' => 'The session has expired or been modified.']);
+                ->withCookie(cookie()->forget('user_session'))
+                ->withErrors(['error' => 'La sesión ha expirado o no es válida.']);
         }
 
-        // If the cookie has not changed, store its value for future comparisons
+        // Caso 2: La cookie está ausente mientras hay sesión activa → cerrar sesión
+        if (Auth::check() && !$currentUserSession) {
+            Auth::logout();
+            return redirect()->route('login')
+                ->withCookie(cookie()->forget('laravel_session'))
+                ->withErrors(['error' => 'Sesión inválida, vuelve a iniciar sesión.']);
+        }
+
+        // Caso 3: La cookie cambió (posible manipulación)
+        if ($storedUserSession && $currentUserSession !== $storedUserSession) {
+            Auth::logout();
+            return redirect()->route('login')
+                ->withCookie(cookie()->forget('user_session'))
+                ->withCookie(cookie()->forget('laravel_session'))
+                ->withErrors(['error' => 'Tu sesión ha sido modificada o ha expirado.']);
+        }
+
+        // Caso válido: todo bien, almacenar la sesión actual
         session(['user_session_token' => $currentUserSession]);
 
-        // If the cookie is present and has not changed, proceed with the request
         return $next($request);
     }
 }

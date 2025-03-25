@@ -17,7 +17,11 @@ class RegisterController extends Controller
     // Show the registration form
     public function showRegistrationForm()
     {
-        return view('auth.register');
+        // Asegúrate que la sesión esté limpia si entran directo
+        session()->flush();
+    
+        // Borra la cookie si aún está
+        return response()->view('auth.register')->withCookie(cookie()->forget('user_session'));
     }
 
     // Handle registration and send email verification
