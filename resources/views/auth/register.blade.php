@@ -106,10 +106,10 @@
                 </div>
             @endif
 
-            @if($errors->any())
-                <div class="error-alert">
+            @if(session('register_errors'))
+                <div class="alert alert-danger">
                     <ul>
-                        @foreach($errors->all() as $error)
+                        @foreach(session('register_errors') as $error)
                             <li>{{ $error }}</li>
                         @endforeach
                     </ul>

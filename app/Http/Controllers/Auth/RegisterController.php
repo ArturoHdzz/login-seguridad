@@ -23,51 +23,72 @@ class RegisterController extends Controller
     // Handle registration and send email verification
     public function register(Request $request)
     {
-        // Validate the input data
-        $validatedData = $request->validate([
-            'name' => ['required', 'string', 'min:3', 'max:100', 'regex:/^[A-Za-zÁ-ÿ\s]+$/'],
-            'email' => ['required', 'email', 'unique:users,email', 'max:255', 'regex:/^([a-zA-Z0-9._%+-]+@(gmail\.com|hotmail\.com))$/'],
-            'password' => [
-                'required', 
-                'min:8', 
-                'confirmed', 
-                'regex:/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/'
-            ],
-            'g-recaptcha-response' => ['required', 'captcha']
-        ]);
+        $errors = [];
+    
+        // Validación manual
+        if (!$request->filled('name') || !preg_match('/^[A-Za-zÁ-ÿ\s]+$/', $request->name)) {
+            $errors[] = 'El nombre es obligatorio y solo debe contener letras.';
+        }
+    
+        if (!$request->filled('email') || !filter_var($request->email, FILTER_VALIDATE_EMAIL)) {
+            $errors[] = 'El correo electrónico no es válido.';
+        } elseif (!preg_match('/^([a-zA-Z0-9._%+-]+@(gmail\.com|hotmail\.com))$/', $request->email)) {
+            $errors[] = 'Solo se permiten correos de Gmail o Hotmail.';
+        } elseif (User::where('email', $request->email)->exists()) {
+            $errors[] = 'El correo ya está registrado.';
+        }
+    
+        if (!$request->filled('password')) {
+            $errors[] = 'La contraseña es obligatoria.';
+        } elseif (!preg_match('/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&]).{8,}$/', $request->password)) {
+            $errors[] = 'La contraseña debe tener al menos 8 caracteres, incluyendo una mayúscula, una minúscula, un número y un símbolo.';
+        }
+    
+        if ($request->password !== $request->password_confirmation) {
+            $errors[] = 'La confirmación de contraseña no coincide.';
+        }
+    
+        if (!$request->filled('g-recaptcha-response')) {
+            $errors[] = 'Debes resolver el reCAPTCHA.';
+        } elseif (!app('captcha')->verify($request->input('g-recaptcha-response'))) {
+            $errors[] = 'El reCAPTCHA no fue válido.';
+        }
+    
+        // Si hay errores, redireccionar con mensajes personalizados
+        if (!empty($errors)) {
+            return redirect()->route('register.show')
+                ->with('register_errors', $errors)
+                ->withInput($request->except('password', 'password_confirmation'));
+        }
     
         try {
-            // Create the user without verification
+            // Crear usuario
             $user = User::create([
-                'name' => $validatedData['name'],
-                'email' => $validatedData['email'],
-                'password' => $validatedData['password'],
+                'name' => $request->name,
+                'email' => $request->email,
+                'password' => $request->password,
             ]);
     
-            // Generate a signed URL that expires in 24 hours
+            // Generar link firmado
             $url = URL::temporarySignedRoute(
                 'verification.email',
                 now()->addHours(24),
                 ['id' => $user->id]
             );
     
-            // Send the verification email
+            // Enviar correo
             Mail::to($user->email)->send(new EmailVerification($url, $user->name));
     
-            // Redirect with a detailed success message
             return redirect()->route('login')->with('success', 
-                'Registration successful! We have sent a verification email to ' . $user->email . 
-                ' with a link to verify your account. Please check your inbox and spam folder. ' .
-                'The link will expire in 24 hours.'
+                '¡Registro exitoso! Te enviamos un correo a ' . $user->email . 
+                ' con un enlace para verificar tu cuenta. Por favor revisa tu bandeja de entrada o spam. El enlace expira en 24 horas.'
             );
-    
         } catch (\Exception $e) {
-            // Handle errors while sending the email
-            return redirect()->back()
-                ->withInput()
-                ->withErrors(['error' => 'There was an issue sending the verification email. Please try again.']);
+            return redirect()->route('register.show')
+                ->with('register_errors', ['Hubo un problema al enviar el correo de verificación. Intenta de nuevo.'])
+                ->withInput($request->except('password', 'password_confirmation'));
         }
-    }
+    }    
 
     // Verify email through the provided signed URL
     public function verifyEmail(Request $request, $id)
