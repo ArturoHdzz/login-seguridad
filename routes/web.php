@@ -102,7 +102,7 @@ Route::middleware(['web'])->group(function () {
      * - auth: Ensures the user is authenticated
      * - check.user.session: Validates the user's session
      */
-    Route::middleware(['auth', 'verified.email'])->group(function () {
+    Route::middleware(['auth', 'check.user.session', 'verified.email'])->group(function () {
         // Dashboard
         Route::get('/dashboard', function () {
             return view('dashboard');

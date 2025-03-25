@@ -125,6 +125,7 @@ class LoginController extends Controller
     
         // Create a persistent session cookie for the user
         $response = redirect()->intended(RouteServiceProvider::HOME);
+        $response->withCookie(cookie()->forever('user_session', encrypt($user->id)));
     
         // Log the user in manually
         Auth::login($user);
@@ -150,6 +151,10 @@ class LoginController extends Controller
         // Log the user out manually
         Auth::logout();
     
-        return redirect()->route('login');
+        // Remove the 'user_session' cookie
+        $response = redirect()->route('login')
+            ->withCookie(cookie()->forget('user_session'));
+    
+        return $response;
     }
 }
