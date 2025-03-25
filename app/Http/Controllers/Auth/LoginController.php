@@ -33,38 +33,17 @@ class LoginController extends Controller
      */
     public function step1(Request $request)
     {
-        // Use el Validator facade para control manual
-        $validator = \Illuminate\Support\Facades\Validator::make($request->all(), [
+        // Validate email and password from the login form
+        $credentials = $request->validate([
             'email' => ['required', 'email'],
             'password' => ['required'],
-            'g-recaptcha-response' => ['required']
+            'g-recaptcha-response' => ['required', 'captcha']
         ]);
-        
-        // Validación manual de captcha para evitar problemas en producción
-        if ($request->has('g-recaptcha-response')) {
-            $captcha = $request->input('g-recaptcha-response');
-            $response = \Illuminate\Support\Facades\Http::asForm()->post('https://www.google.com/recaptcha/api/siteverify', [
-                'secret' => config('captcha.secret'),
-                'response' => $captcha,
-                'remoteip' => $request->ip()
-            ]);
-            
-            if (!$response->json('success')) {
-                $validator->errors()->add('g-recaptcha-response', 'La verificación de captcha falló.');
-            }
-        }
-        
-        // Si hay errores, redirigir con errores
-        if ($validator->fails()) {
-            return redirect()->back()
-                ->withErrors($validator)
-                ->withInput();
-        }
-        
-        // Continuar con el resto del código existente
-        $user = User::where('email', $request->email)->first();
     
-        if (!$user || !Hash::check($request->password, $user->password)) {
+        // Check if the user exists and if the password matches
+        $user = User::where('email', $credentials['email'])->first();
+    
+        if (!$user || !Hash::check($credentials['password'], $user->password)) {
             return back()->withErrors([
                 'email' => 'The credentials do not match our records.'
             ])->withInput();
@@ -123,34 +102,13 @@ class LoginController extends Controller
      */
     public function verifyCode(Request $request)
     {
-        // Use el Validator facade para control manual
-        $validator = \Illuminate\Support\Facades\Validator::make($request->all(), [
+        // Validate that the code is a string of exactly 6 characters
+        $request->validate([
             'code' => ['required', 'string', 'size:6'],
-            'g-recaptcha-response' => ['required']
+            'g-recaptcha-response' => ['required', 'captcha']
         ]);
-        
-        // Validación manual de captcha para evitar problemas en producción
-        if ($request->has('g-recaptcha-response')) {
-            $captcha = $request->input('g-recaptcha-response');
-            $response = \Illuminate\Support\Facades\Http::asForm()->post('https://www.google.com/recaptcha/api/siteverify', [
-                'secret' => config('captcha.secret'),
-                'response' => $captcha,
-                'remoteip' => $request->ip()
-            ]);
-            
-            if (!$response->json('success')) {
-                $validator->errors()->add('g-recaptcha-response', 'La verificación de captcha falló.');
-            }
-        }
-        
-        // Si hay errores, redirigir con errores
-        if ($validator->fails()) {
-            return redirect()->back()
-                ->withErrors($validator)
-                ->withInput();
-        }
-        
-        // Continuar con el resto del código existente
+    
+        // Find the user by email and ensure the code is not expired
         $user = User::where('email', session('login_email'))
                    ->where('code_expires_at', '>', now())
                    ->first();

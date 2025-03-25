@@ -26,7 +26,7 @@ use App\Http\Controllers\Auth\LoginController;
  * - web: Session, CSRF, and cookies
  * - prevent-back: Prevent back navigation for security reasons
  */
-Route::middleware(['web', 'prevent-back'])->group(function () {
+Route::middleware(['web'])->group(function () {
     /**
      * Root route - Redirects to login
      */
