@@ -21,7 +21,9 @@ class LoginController extends Controller
      */
     public function showLoginForm()
     {
-        return view('auth.login');
+        return response()
+        ->view('auth.login')
+        ->withCookie(cookie()->forget('user_session'));
     }
 
     /**
@@ -72,7 +74,10 @@ class LoginController extends Controller
         $request->session()->save();
     
         // Redirigir al formulario de verificación
-        return redirect()->route('login.verification')->with('info', 'A verification code has been sent to your email.');
+        return redirect()
+        ->route('login.verification')
+        ->with('info', 'A verification code has been sent to your email.')
+        ->withCookie(cookie()->forget('user_session'));
     }
     
 
