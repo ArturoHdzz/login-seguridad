@@ -96,47 +96,64 @@ class LoginController extends Controller
     /**
      * Handle code verification and login.
      */
+    /**
+     * Handles verification code input, validates it along with reCAPTCHA, and logs in the user.
+     *
+     * @param \Illuminate\Http\Request $request
+     * @return \Illuminate\Http\RedirectResponse
+     */
     public function verifyCode(Request $request)
     {
         $errors = [];
 
-        if (!$request->filled('code') || strlen($request->code) !== 6) {
-            $errors[] = 'The verification code must be exactly 6 characters.';
+        // Validate verification code
+        if (!$request->filled('code') || !preg_match('/^[0-9A-Za-z]{6}$/', $request->code)) {
+            $errors[] = 'The verification code must be exactly 6 alphanumeric characters.';
         }
 
+        // Validate reCAPTCHA
         if (!$request->filled('g-recaptcha-response')) {
-            $errors[] = 'reCAPTCHA is required.';
+            $errors[] = 'Please complete the reCAPTCHA.';
         } elseif (!app('captcha')->verifyResponse($request->input('g-recaptcha-response'))) {
-            $errors[] = 'Invalid reCAPTCHA.';
+            $errors[] = 'Invalid reCAPTCHA. Please try again.';
         }
 
+        // Return with errors if any
         if (!empty($errors)) {
-            return redirect()->back()
-                ->withErrors($errors)
-                ->withInput();
+            return redirect()->route('login.verification')
+                ->with('login_errors', $errors)
+                ->withInput($request->except('code'));
         }
 
+        // Get user from session
         $user = User::where('email', session('login_email'))
-            ->where('code_expires_at', '>', now())
-            ->first();
+                ->where('code_expires_at', '>', now())
+                ->first();
 
         if (!$user || !Hash::check($request->code, $user->verification_code)) {
-            return back()->withErrors(['code' => 'Invalid or expired code.']);
+            return redirect()->route('login.verification')
+                ->with('login_errors', ['Invalid or expired verification code.']);
         }
 
         // Clear session and regenerate
         session()->flush();
         session()->regenerate(true);
 
+        // Store user session cookie
+        $response = redirect()->intended(RouteServiceProvider::HOME);
+        $response->withCookie(cookie()->forever('user_session', encrypt($user->id)));
+
+        // Log user in
         Auth::login($user);
+
+        // Clear verification fields
         $user->update([
             'verification_code' => null,
             'code_expires_at' => null,
             'last_login_at' => now(),
         ]);
 
-        return redirect()->intended(RouteServiceProvider::HOME)
-            ->withCookie(cookie()->forever('user_session', encrypt($user->id)));
+        return $response;
     }
 
     /**
