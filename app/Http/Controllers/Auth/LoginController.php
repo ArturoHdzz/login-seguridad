@@ -33,49 +33,48 @@ class LoginController extends Controller
      */
     public function step1(Request $request)
     {
-        // Validate email and password from the login form
+        // Validación de campos con reCAPTCHA
         $credentials = $request->validate([
             'email' => ['required', 'email'],
             'password' => ['required'],
             'g-recaptcha-response' => ['required', 'captcha']
         ]);
     
-        // Check if the user exists and if the password matches
+        // Buscar usuario
         $user = User::where('email', $credentials['email'])->first();
     
+        // Verificación de credenciales
         if (!$user || !Hash::check($credentials['password'], $user->password)) {
-            return back()->withErrors([
-                'email' => 'The credentials do not match our records.'
-            ])->withInput();
+            return back()->withErrors(['email' => 'The credentials do not match our records.'])->withInput();
         }
     
-        // Ensure the user has verified their email before logging in
+        // Verificación de correo
         if (!$user->email_verified) {
-            return back()->withErrors([
-                'email' => 'You must verify your email address before logging in.'
-            ])->withInput();
+            return back()->withErrors(['email' => 'You must verify your email address before logging in.'])->withInput();
         }
     
-        // Generate a random verification code
+        // Importante: NO iniciar sesión aquí ni crear cookie personalizada
+    
+        // Generar código de verificación
         $plainCode = Str::random(6);
         $hashedCode = Hash::make($plainCode);
     
-        // Update the user with the hashed verification code and expiration time (15 minutes)
         $user->update([
             'verification_code' => $hashedCode,
             'code_expires_at' => now()->addMinutes(15)
         ]);
-     
-        // Send the code to the user's email
+    
+        // Enviar correo
         Mail::to($user->email)->send(new VerificationCodeMail($plainCode));
     
-        // Store the user's email in the session
+        // Guardar el email temporalmente en sesión para el paso 2
         $request->session()->put('login_email', $user->email);
         $request->session()->save();
     
-        // Ensure the session is saved before redirecting
+        // Redirigir al formulario de verificación
         return redirect()->route('login.verification')->with('info', 'A verification code has been sent to your email.');
     }
+    
 
     /**
      * Display the verification form where the user can enter the verification code.
