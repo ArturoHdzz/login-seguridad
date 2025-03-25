@@ -21,11 +21,7 @@ class LoginController extends Controller
      */
     public function showLoginForm()
     {
-        session()->invalidate();
-        session()->regenerate();
-    
-        // Borra la cookie personalizada para evitar conflictos
-        return response()->view('auth.login')->withCookie(cookie()->forget('user_session'));
+        return view('auth.login');
     }
 
     /**

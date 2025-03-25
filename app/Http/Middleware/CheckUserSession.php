@@ -5,48 +5,71 @@ namespace App\Http\Middleware;
 use Closure;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
 use App\Models\User;
+use Illuminate\Support\Facades\Crypt;
 
 class CheckUserSession
 {
-    /**
+      /**
      * Handle an incoming request.
      *
-     * This middleware ensures the presence and validity of the 'user_session' cookie,
-     * and that the authenticated user session matches it.
+     * @param \Illuminate\Http\Request $request
+     * @param \Closure $next
+     * @return \Illuminate\Http\RedirectResponse|\Illuminate\Http\Response
      */
     public function handle(Request $request, Closure $next)
     {
-        $currentUserSession = $request->cookie('user_session');
-        $storedUserSession = session('user_session_token');
+        try {
+            // Check if the user is authenticated
+            if (!Auth::check()) {
+                return $this->handleUnauthenticated($request);
+            }
 
-        // Caso 1: El usuario no está autenticado pero la cookie 'user_session' existe → inválido
-        if (!Auth::check() && $currentUserSession) {
-            return redirect()->route('login')
-                ->withCookie(cookie()->forget('user_session'))
-                ->withErrors(['error' => 'La sesión ha expirado o no es válida.']);
+            // Retrieve the 'user_session' cookie
+            $userSessionCookie = $request->cookie('user_session');
+
+            // If no cookie is present, force logout
+            if (!$userSessionCookie) {
+                return $this->handleUnauthenticated($request);
+            }
+
+            // Decrypt the cookie value
+            try {
+                $decryptedUserId = Crypt::decrypt($userSessionCookie);
+            } catch (\Exception $e) {
+                Log::error('User session cookie decryption failed: ' . $e->getMessage());
+                return $this->handleUnauthenticated($request);
+            }
+
+            // Verify that the decrypted user ID matches the currently authenticated user
+            if ($decryptedUserId !== Auth::id()) {
+                return $this->handleUnauthenticated($request);
+            }
+
+            return $next($request);
+        } catch (\Exception $e) {
+            // Log any unexpected errors
+            Log::error('Unexpected error in CheckUserSession middleware: ' . $e->getMessage());
+            return $this->handleUnauthenticated($request);
         }
+    }
 
-        // Caso 2: La cookie está ausente mientras hay sesión activa → cerrar sesión
-        if (Auth::check() && !$currentUserSession) {
-            Auth::logout();
-            return redirect()->route('login')
-                ->withCookie(cookie()->forget('laravel_session'))
-                ->withErrors(['error' => 'Sesión inválida, vuelve a iniciar sesión.']);
-        }
+    /**
+     * Handle unauthenticated requests
+     *
+     * @param Request $request
+     * @return \Illuminate\Http\RedirectResponse
+     */
+    protected function handleUnauthenticated(Request $request)
+    {
+        Auth::logout();
+        $request->session()->invalidate();
+        $request->session()->regenerateToken();
 
-        // Caso 3: La cookie cambió (posible manipulación)
-        if ($storedUserSession && $currentUserSession !== $storedUserSession) {
-            Auth::logout();
-            return redirect()->route('login')
-                ->withCookie(cookie()->forget('user_session'))
-                ->withCookie(cookie()->forget('laravel_session'))
-                ->withErrors(['error' => 'Tu sesión ha sido modificada o ha expirado.']);
-        }
-
-        // Caso válido: todo bien, almacenar la sesión actual
-        session(['user_session_token' => $currentUserSession]);
-
-        return $next($request);
+        return redirect()->route('login')
+            ->withErrors(['error' => 'Your session has expired. Please log in again.'])
+            ->withCookie(cookie()->forget('user_session'))
+            ->withCookie(cookie()->forget('laravel_session'));
     }
 }
