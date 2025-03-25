@@ -14,9 +14,9 @@
             @csrf
             <h2>Verificación de Correo</h2>
 
-            @if($errors->any())
-                <div class="alerta-error">
-                    @foreach($errors->all() as $error)
+            @if(session('register_errors'))
+                <div class="error-alert">
+                    @foreach(session('register_errors') as $error)
                         <p>{{ $error }}</p>
                     @endforeach
                 </div>

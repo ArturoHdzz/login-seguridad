@@ -127,40 +127,67 @@ class RegisterController extends Controller
     /**
      * Handle code verification for registration (if used).
      */
+    /**
+     * Handle registration verification code submission and validate manually.
+     *
+     * @param \Illuminate\Http\Request $request
+     * @return \Illuminate\Http\RedirectResponse
+     */
     public function verifyRegistration(Request $request)
     {
         $errors = [];
 
-        if (!$request->filled('code') || strlen($request->code) !== 6) {
-            $errors[] = 'The code must be exactly 6 characters.';
+        // Validate verification code format
+        if (!$request->filled('code') || !preg_match('/^[0-9A-Za-z]{6}$/', $request->code)) {
+            $errors[] = 'The verification code must be exactly 6 alphanumeric characters.';
         }
 
+        // Validate reCAPTCHA
+        if (!$request->filled('g-recaptcha-response')) {
+            $errors[] = 'Please complete the reCAPTCHA.';
+        } elseif (!app('captcha')->verifyResponse($request->input('g-recaptcha-response'))) {
+            $errors[] = 'Invalid reCAPTCHA. Please try again.';
+        }
+
+        // Redirect back with errors
         if (!empty($errors)) {
-            return back()->withErrors($errors);
+            return redirect()->route('verification.registration')
+                ->with('register_errors', $errors)
+                ->withInput($request->except('code'));
         }
 
+        // Get user from session
         $email = session('verify_email');
         if (!$email) {
-            return redirect()->route('register.show');
+            return redirect()->route('register.show')->with('register_errors', [
+                'Your verification session has expired. Please register again.'
+            ]);
         }
 
+        // Find the user and ensure the code is not expired
         $user = User::where('email', $email)
                     ->where('email_verified', false)
                     ->where('code_expires_at', '>', now())
                     ->first();
 
         if (!$user) {
-            return back()->withErrors(['code' => 'User not found or code has expired.']);
+            return redirect()->route('verification.registration')->with('register_errors', [
+                'User not found or verification code has expired.'
+            ]);
         }
 
+        // Verify the code
         if (!Hash::check($request->code, $user->verification_code)) {
-            return back()->withErrors(['code' => 'Invalid code.']);
+            return redirect()->route('verification.registration')->with('register_errors', [
+                'Invalid verification code.'
+            ]);
         }
 
+        // Mark email as verified
         $user->update([
             'email_verified' => true,
             'verification_code' => null,
-            'code_expires_at' => null
+            'code_expires_at' => null,
         ]);
 
         session()->forget('verify_email');
