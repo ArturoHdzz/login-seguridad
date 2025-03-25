@@ -11,6 +11,7 @@ use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Mail;
 use App\Mail\VerificationCodeMail;
 use App\Providers\RouteServiceProvider;
+use Illuminate\Support\Facades\Validator;
 
 class LoginController extends Controller
 {
@@ -34,11 +35,17 @@ class LoginController extends Controller
     public function step1(Request $request)
     {
         // Validate email and password from the login form
-        $credentials = $request->validate([
+        $validator = Validator::make($request->all(), [
             'email' => ['required', 'email'],
             'password' => ['required'],
-            'g-recaptcha-response' => ['required', 'captcha']
+            'g-recaptcha-response' => ['required', 'captcha'],
         ]);
+        
+        if ($validator->fails()) {
+            return back()->withErrors($validator)->withInput();
+        }
+        
+        $credentials = $validator->validated();
     
         // Check if the user exists and if the password matches
         $user = User::where('email', $credentials['email'])->first();
@@ -103,10 +110,14 @@ class LoginController extends Controller
     public function verifyCode(Request $request)
     {
         // Validate that the code is a string of exactly 6 characters
-        $request->validate([
+        $validator = Validator::make($request->all(), [
             'code' => ['required', 'string', 'size:6'],
-            'g-recaptcha-response' => ['required', 'captcha']
+            'g-recaptcha-response' => ['required', 'captcha'],
         ]);
+        
+        if ($validator->fails()) {
+            return back()->withErrors($validator)->withInput();
+        }
     
         // Find the user by email and ensure the code is not expired
         $user = User::where('email', session('login_email'))
