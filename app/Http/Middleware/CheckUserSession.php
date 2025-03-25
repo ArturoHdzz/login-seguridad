@@ -5,71 +5,53 @@ namespace App\Http\Middleware;
 use Closure;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Log;
 use App\Models\User;
-use Illuminate\Support\Facades\Crypt;
 
 class CheckUserSession
 {
-      /**
+    /**
      * Handle an incoming request.
      *
+     * This middleware checks the presence of the `user_session` cookie in the request.
+     * If the cookie is missing or its value has changed, the user's session is logged out and they are redirected to the login page.
+     * If the cookie is present and its value has not changed, the request is allowed to proceed.
+     * 
      * @param \Illuminate\Http\Request $request
      * @param \Closure $next
      * @return \Illuminate\Http\RedirectResponse|\Illuminate\Http\Response
      */
     public function handle(Request $request, Closure $next)
     {
-        try {
-            // Check if the user is authenticated
-            if (!Auth::check()) {
-                return $this->handleUnauthenticated($request);
-            }
+        // Check if the 'user_session' cookie is present
+        if (!$request->hasCookie('user_session')) {
+            // If the cookie is not present, log the user out
+            Auth::logout();
 
-            // Retrieve the 'user_session' cookie
-            $userSessionCookie = $request->cookie('user_session');
-
-            // If no cookie is present, force logout
-            if (!$userSessionCookie) {
-                return $this->handleUnauthenticated($request);
-            }
-
-            // Decrypt the cookie value
-            try {
-                $decryptedUserId = Crypt::decrypt($userSessionCookie);
-            } catch (\Exception $e) {
-                Log::error('User session cookie decryption failed: ' . $e->getMessage());
-                return $this->handleUnauthenticated($request);
-            }
-
-            // Verify that the decrypted user ID matches the currently authenticated user
-            if ($decryptedUserId !== Auth::id()) {
-                return $this->handleUnauthenticated($request);
-            }
-
-            return $next($request);
-        } catch (\Exception $e) {
-            // Log any unexpected errors
-            Log::error('Unexpected error in CheckUserSession middleware: ' . $e->getMessage());
-            return $this->handleUnauthenticated($request);
+            // Redirect to the login page and forget the session cookie
+            return redirect()->route('login')->withCookie(cookie()->forget('laravel_session'));
         }
-    }
 
-    /**
-     * Handle unauthenticated requests
-     *
-     * @param Request $request
-     * @return \Illuminate\Http\RedirectResponse
-     */
-    protected function handleUnauthenticated(Request $request)
-    {
-        Auth::logout();
-        $request->session()->invalidate();
-        $request->session()->regenerateToken();
+        // Retrieve the current value of the 'user_session' cookie
+        $currentUserSession = $request->cookie('user_session');
+        
+        // Retrieve the stored session token
+        $storedUserSession = session('user_session_token');
 
-        return redirect()->route('login')
-            ->withErrors(['error' => 'Your session has expired. Please log in again.'])
-            ->withCookie(cookie()->forget('user_session'))
-            ->withCookie(cookie()->forget('laravel_session'));
+        // Check if the stored session token is available and if it has changed
+        if ($storedUserSession && $currentUserSession !== $storedUserSession) {
+            // If the session token has changed, log the user out
+            Auth::logout();
+
+            // Redirect to the login page, forget the session cookie, and display an error message
+            return redirect()->route('login')
+                ->withCookie(cookie()->forget('laravel_session'))
+                ->withErrors(['error' => 'The session has expired or been modified.']);
+        }
+
+        // If the cookie has not changed, store its value for future comparisons
+        session(['user_session_token' => $currentUserSession]);
+
+        // If the cookie is present and has not changed, proceed with the request
+        return $next($request);
     }
 }
