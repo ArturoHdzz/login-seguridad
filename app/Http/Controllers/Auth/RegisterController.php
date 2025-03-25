@@ -11,6 +11,7 @@ use Illuminate\Support\Facades\Hash;
 use App\Models\User;
 use App\Mail\VerificationMail;
 use App\Mail\EmailVerification;
+use Illuminate\Support\Facades\Validator;
 
 class RegisterController extends Controller
 {
@@ -24,7 +25,7 @@ class RegisterController extends Controller
     public function register(Request $request)
     {
         // Validate the input data
-        $validatedData = $request->validate([
+        $validator = Validator::make($request->all(), [
             'name' => ['required', 'string', 'min:3', 'max:100', 'regex:/^[A-Za-zÁ-ÿ\s]+$/'],
             'email' => ['required', 'email', 'unique:users,email', 'max:255', 'regex:/^([a-zA-Z0-9._%+-]+@(gmail\.com|hotmail\.com))$/'],
             'password' => [
@@ -35,6 +36,12 @@ class RegisterController extends Controller
             ],
             'g-recaptcha-response' => ['required', 'captcha']
         ]);
+        
+        if ($validator->fails()) {
+            return back()->withErrors($validator)->withInput();
+        }
+        
+        $validatedData = $validator->validated();
     
         try {
             // Create the user without verification
@@ -105,9 +112,13 @@ class RegisterController extends Controller
     public function verifyRegistration(Request $request)
     {
         // Validate the verification code
-        $request->validate([
+        $validator = Validator::make($request->all(), [
             'code' => ['required', 'string', 'size:6']
         ]);
+        
+        if ($validator->fails()) {
+            return back()->withErrors($validator)->withInput();
+        }
 
         $email = session('verify_email');
         if (!$email) {
