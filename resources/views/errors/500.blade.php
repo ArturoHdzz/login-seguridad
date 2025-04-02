@@ -24,6 +24,6 @@
 </head>
 <body>
     <h1>🚧 Error 500</h1>
-    <p>Estamos experimentando problemas técnicos.<br>Por favor, intenta más tarde.</p>
+    <p>We are experiencing technical issues..<br>Please try again later.</p>
 </body>
 </html>
